@@ -1,0 +1,5 @@
+{
+    "config":{"platform":"Linux","app_params":{"debug":1,"event_loop":15}},
+    "service":{"provider":"VE"},
+    "hardware":{"model":"RPI","type":"2","version":"001","batch":"09015","firmware":"001-dev"}
+}
