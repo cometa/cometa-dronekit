@@ -73,6 +73,9 @@ def _get_autopilot_attributes(params):
 	ret['capabilities'] = vehicle.capabilities.__dict__
 	return ret
 
+global attribute_names
+attribute_names = ('attitude','location','velocity','gps','gimbal','battery','ekf_ok','last_heartbeat','rangefinder','heading','armable','state','groundspeed','airspeed','mode','armed')
+
 def _get_vehicle_attributes(params):
 	ret = {}
 	ret['attitude'] = vehicle.attitude.__dict__
@@ -145,6 +148,18 @@ def _set_home_location(params):
 	vehicle.home_location = LocationGlobal(lat=params['lat'],lon=params['lon'],alt=params['alt'])
 	return {"success": True}
 
+"""
+Expects an object like {'period':5} 
+"""
+def _set_telemetry_period(params):
+	if type(params) is not dict or 'period' not in params.keys():
+		return {"success": False}
+	if params['period'] <= 0:
+		return {"success": False}
+	config['app_params']['event_loop'] = params['period']
+	return {"success": True}
+
+global rpc_methods
 rpc_methods = ({'name':'shell','function':_shell}, 
 #               {'name':'status','function':show_status}, 
                {'name':'video_devices','function':_video_devices}, 
@@ -153,7 +168,7 @@ rpc_methods = ({'name':'shell','function':_shell},
                {'name':'autopilot_attributes','function':_get_autopilot_attributes},
                {'name':'vehicle_parameters','function':_get_vehicle_parameters},
 			   {'name':'set_parameters','function':_set_vehicle_parameters},
-
+			   {'name':'set_telemetry_period','function':_set_telemetry_period},
                {'name':'home_location','function':_get_home_location},
                {'name':'set_home_location','function':_set_home_location}
 )
@@ -211,10 +226,19 @@ def message_handler(msg, msg_len):
 
     return json.dumps(reply)
 
+global telemetry_attributes_names
+telemetry_attributes_names = ('attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed')
+
+def get_telemetry():
+	attr = _get_vehicle_attributes(None)
+	ret = {}
+	for k in telemetry_attributes_names:
+		ret[k] = attr[k]
+	return ret
+
 # --------------------
 # 
 # Utility functions
-
 def check_rpc_msg(req):
     ret = False
     id = None
@@ -250,9 +274,7 @@ def isanumber(x):
 # 
 # Entry point
 
-
 def main(argv):
-
 	global config
 	config = Runtime.read_config()
 
@@ -268,13 +290,11 @@ def main(argv):
 	vehicle.wait_ready('autopilot_version')
 
 	# Get some vehicle attributes (state)
-	print "Get some vehicle attribute values:"
 	print " GPS: %s" % vehicle.gps_0
 	print " Battery: %s" % vehicle.battery
-	print " Last Heartbeat: %s" % vehicle.last_heartbeat
 	print " Is Armable?: %s" % vehicle.is_armable
 	print " System status: %s" % vehicle.system_status.state
-	print " Mode: %s" % vehicle.mode.name    # settable
+	print " Mode: %s" % vehicle.mode.name
 
 	cometa_server = config['cometa']['server']
 	cometa_port = config['cometa']['port']
@@ -317,11 +337,16 @@ def main(argv):
 		"""
 		Send a telemetry data event upstream. 
 		"""
-		time.sleep(60)
-		now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-		msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
+		time.sleep(config['app_params']['event_loop'])
+		msg = get_telemetry()
+		msg['id'] = device_id
+		msg['time'] = int(time.time())
+		msg['type'] = 1
 
-		if com.send_data(msg) < 0:
+		#now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+		#msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
+
+		if com.send_data(str(msg)) < 0:
 			print "Error in sending data."
 		else:
 			if com.debug:
