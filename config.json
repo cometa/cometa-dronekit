@@ -1,5 +1,5 @@
 {
-    "config":{"platform":"Linux","app_params":{"debug":1,"event_loop":15}},
+    "config":{"connection_string":"tcp:127.0.0.1:5760", "sitl":true, "cometa":{"server":"dronekit.cometa.io", "port": 443, "app_key":"80d25d08e5fa6e13fb0a", "ssl":true }, "app_params":{"debug":true,"event_loop":15}},
     "service":{"provider":"VE"},
-    "hardware":{"model":"RPI","type":"2","version":"001","batch":"09015","firmware":"001-dev"}
+    "hardware":{"model":"Solo","type":"2","version":"001","batch":"09015","firmware":"001-dev"}
 }
