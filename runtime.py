@@ -121,12 +121,12 @@ class Runtime(object):
             content = json.loads(f.read())['config']
 
             # get Cometa API Key and Server name from the environment
-            if not 'cometa_app' in content:
-            	content['cometa_app'] =  os.environ['COMETA_APIKEY']
-            if not 'cometa_server' in content:
-            	content['cometa_server'] = os.environ['COMETA_SERVER']
-            if not 'cometa_port' in content: 
-            	content['cometa_port'] = int(os.environ['COMETA_PORT'])
+            if not 'app_key' in content['cometa']:
+            	content['cometa']['app_key'] =  os.environ['COMETA_APIKEY']
+            if not 'server' in content['cometa']:
+            	content['cometa']['server'] = os.environ['COMETA_SERVER']
+            if not 'port' in content['cometa']: 
+            	content['cometa']['port'] = int(os.environ['COMETA_PORT'])
             return content
         except Exception as e:
             print e
@@ -141,12 +141,12 @@ class Runtime(object):
             #content = f.read().replace(u'\n', u'').replace(u'\r', u'')
             content = json.loads(f.read().replace('\n', '').replace('\r', ''))
             # get Cometa API Key and Server name from the environment
-            if not 'cometa_app' in content['config']:
-            	content['config']['cometa_app'] =  os.environ['COMETA_APIKEY'] 
-            if not 'cometa_server' in content['config']:
-            	content['config']['cometa_server'] = os.environ['COMETA_SERVER']
-            if not 'cometa_port' in content['config']:         
-            	content['config']['cometa_port'] = int(os.environ['COMETA_PORT'])          
+            if not 'app_key' in content['cometa']:
+            	content['cometa']['app_key'] =  os.environ['COMETA_APIKEY']
+            if not 'server' in content['cometa']:
+            	content['cometa']['server'] = os.environ['COMETA_SERVER']
+            if not 'port' in content['cometa']: 
+            	content['cometa']['port'] = int(os.environ['COMETA_PORT'])         
             return content
         except Exception as e:
             return ""

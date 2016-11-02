@@ -177,15 +177,23 @@ def isanumber(x):
 
 from dronekit import connect, VehicleMode
 
-config = Runtime.read_config()
 
-if config['sitl']:
-	import dronekit_sitl
-	vsitl = dronekit_sitl.start_default()
-
-vehicle = connect(config['connection_string'], wait_ready=True)
 
 def main(argv):
+
+	global config
+	config = Runtime.read_config()
+
+	if config['sitl']:
+		import dronekit_sitl
+		global vsitl 
+		vsitl = dronekit_sitl.start_default()
+
+	print "\nConnecting to vehicle at: %s" % (config['connection_string'])
+
+	global vehicle 
+	vehicle = connect(config['connection_string'], wait_ready=True)
+	vehicle.wait_ready('autopilot_version')
 
 	# Get some vehicle attributes (state)
 	print "Get some vehicle attribute values:"
@@ -196,9 +204,9 @@ def main(argv):
 	print " System status: %s" % vehicle.system_status.state
 	print " Mode: %s" % vehicle.mode.name    # settable
 
-	cometa_server = config['cometa_server']
-	cometa_port = config['cometa_port']
-	application_id = config['cometa_app']
+	cometa_server = config['cometa']['server']
+	cometa_port = config['cometa']['port']
+	application_id = config['cometa']['app_key']
 	# use the machine's MAC address as Cometa device ID
 	device_id = Runtime.get_serial()
 
@@ -208,7 +216,7 @@ def main(argv):
 	# Instantiate a Cometa object
 	com = CometaClient(cometa_server, cometa_port, application_id)
 	# Set debug flag
-	# com.debug = True
+	com.debug = config['app_params']['debug']
 
 	# Bind the message_handler() callback. The callback is doing the function of respoding
 	# to remote requests and handling the core part of the work of the application.
