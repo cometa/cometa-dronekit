@@ -66,11 +66,20 @@ def _video_devices(params):
 	return ret
 # 	return str(vdevices).decode()
 
+def _get_vehicle_attributes(params):
+	ret = {}
+	ret['attitude'] = vehicle.attitude.__dict__
+	ret['location'] = vehicle.location.__dict__
+	return ret
+
+def _get_vehicle_parameters(params):
+	return vehicle.parameters.__dict__['_attribute_cache']
+
 rpc_methods = ({'name':'shell','function':_shell}, 
 #               {'name':'status','function':show_status}, 
                {'name':'video_devices','function':_video_devices}, 
-#               {'name':'setpoint','function':setpoint},
-#               {'name':'get_schedule','function':get_schedule},
+               {'name':'vehicle_attributes','function':_get_vehicle_attributes},
+               {'name':'vehicle_parameters','function':_get_vehicle_parameters},
 #               {'name':'set_schedule','function':set_schedule}
 )
 
@@ -111,8 +120,14 @@ def message_handler(msg, msg_len):
 
     if func == None:
         return JSON_RPC_INVALID_REQUEST
+
     # call the method
-    result = func(req['params'])
+    try:
+        result = func(req['params'])
+    except Exception as e:
+        print e
+        return JSON_RPC_INTERNAL_ERROR_FMT_STR % str(id)
+
     # build the response object
     reply = {}
     reply['jsonrpc'] = "2.0"
@@ -159,9 +174,27 @@ def isanumber(x):
 # --------------------
 # 
 # Entry point
-	
+
+from dronekit import connect, VehicleMode
+
+config = Runtime.read_config()
+
+if config['sitl']:
+	import dronekit_sitl
+	vsitl = dronekit_sitl.start_default()
+
+vehicle = connect(config['connection_string'], wait_ready=True)
+
 def main(argv):
-	config = Runtime.read_config()
+
+	# Get some vehicle attributes (state)
+	print "Get some vehicle attribute values:"
+	print " GPS: %s" % vehicle.gps_0
+	print " Battery: %s" % vehicle.battery
+	print " Last Heartbeat: %s" % vehicle.last_heartbeat
+	print " Is Armable?: %s" % vehicle.is_armable
+	print " System status: %s" % vehicle.system_status.state
+	print " Mode: %s" % vehicle.mode.name    # settable
 
 	cometa_server = config['cometa_server']
 	cometa_port = config['cometa_port']
