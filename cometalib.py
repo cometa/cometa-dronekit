@@ -19,6 +19,7 @@ import socket
 import select
 import time
 import threading
+import ssl
 # From http-parser (0.8.3)
 # pip install http-parser
 from http_parser.parser import HttpParser
@@ -65,7 +66,8 @@ class CometaClient(object):
 		self._device_id = device_id
 		self._platform = device_info
 		self._hparser = HttpParser()
-		self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		tsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self._sock = tsock #ssl.wrap_socket(tsock)
 		try:
 			self._sock.connect((self._server, self._port))
 			sendBuf="POST /v1/applications/%s/devices/%s HTTP/1.1\r\nHost: api.cometa.io\r\nContent-Length:%d\r\n\r\n%s" % (self._app_id,device_id,len(device_info),device_info)
@@ -114,7 +116,8 @@ class CometaClient(object):
 					self._trecv.start()
 
 					return recvBuf
-		except:
+		except  Exception, e:
+			print e
 			self.error = 2
 			return
 

@@ -26,6 +26,8 @@ from time import gmtime, strftime
 from runtime import Runtime
 from cometalib import CometaClient
 
+from dronekit import connect, VehicleMode, LocationGlobal
+
 # JSON-RPC errors
 JSON_RPC_PARSE_ERROR = '{"jsonrpc": "2.0","error":{"code":-32700,"message":"Parse error"},"id": null}'
 JSON_RPC_INVALID_REQUEST = '{"jsonrpc": "2.0","error":{"code":-32600,"message":"Invalid Request"},"id":null}'
@@ -52,8 +54,7 @@ syslog = Runtime.syslog
 def _shell(params):
     # check that params is a list
     if not isinstance(params, list) or len(params) == 0:
-        return "Parameter must be a not empty list"
-    
+        return "Parameter must be a not empty list"    
     command = params[0]
     out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
     return '\n' + out.decode()
@@ -64,23 +65,97 @@ def _video_devices(params):
 	ret['devices'] = vdevices[0]
 	ret['names'] = vdevices[1]
 	return ret
-# 	return str(vdevices).decode()
+
+def _get_autopilot_attributes(params):
+	ret = {}
+	ret['firmware'] = {'version':"%s" % vehicle.version, 'major':vehicle.version.major, 'minor':vehicle.version.minor, 'patch':vehicle.version.patch}
+	ret['release'] = {'type': vehicle.version.release_type(), 'version': vehicle.version.release_version(), 'stable': vehicle.version.is_stable()}
+	ret['capabilities'] = vehicle.capabilities.__dict__
+	return ret
 
 def _get_vehicle_attributes(params):
 	ret = {}
 	ret['attitude'] = vehicle.attitude.__dict__
-	ret['location'] = vehicle.location.__dict__
+	f = vehicle.location.global_frame
+	r = vehicle.location.global_relative_frame
+	l = vehicle.location.local_frame
+	ret['location'] = {'global':{'lat':f.lat,'lon':f.lon,'alt':f.alt}, 'relative':{'lat':r.lat,'lon':r.lon,'alt':r.alt},'local':{'north':l.north,'east':l.east,'down':l.down}}
+	ret['velocity'] = vehicle.velocity
+	ret['gps'] = vehicle.gps_0.__dict__
+	ret['gimbal'] = {'pitch' : vehicle.gimbal._pitch, 'yaw': vehicle.gimbal._yaw, 'roll': vehicle.gimbal._roll}
+	ret['battery'] = vehicle.battery.__dict__
+	ret['ekf_ok'] = vehicle.ekf_ok
+	ret['last_heartbeat'] = vehicle.last_heartbeat
+	ret['rangefinder'] =  vehicle.rangefinder.__dict__
+	ret['heading'] = vehicle.heading
+	ret['armable'] = vehicle.is_armable
+	ret['state'] =vehicle.system_status.state
+	ret['groundspeed'] = vehicle.groundspeed
+	ret['airspeed'] = vehicle.airspeed
+	ret['mode'] = vehicle.mode.name
+	ret['armed'] = vehicle.armed
 	return ret
+
+"""
+Expects an object such as {'armed': True} or {'airspeed':3.2} or {'mode':'GUIDED'}
+"""
+def _set_vehicle_attributes(params):
+	if type(params) is not dict:
+		return {"success": False}
+	if 'armed' in params.keys():
+		vehicle.armed = params['armed']
+	if 'airspeed' in params.keys():
+		vehicle.airspeed = params['airspeed']
+	if 'groundspeed' in params.keys():
+		vehicle.groundspeed = params['groundspeed']
+	if 'mode' in params.keys():
+		vehicle.mode = VehicleMode(params['mode'])
+	return {"success": True}
 
 def _get_vehicle_parameters(params):
 	return vehicle.parameters.__dict__['_attribute_cache']
+
+"""
+Expects params as  {'key':'THR_MIN', 'value': 100}
+"""
+def _set_vehicle_parameters(params):
+	if ('key' and 'value') not in params.keys():
+		return {"success": False}
+	vehicle.parameters[params['key']] = params['value']
+	return {"success": True}
+
+def _get_home_location(params):
+	# Get Vehicle Home location - will be `None` until first set by autopilot
+	while not vehicle.home_location:
+	    cmds = vehicle.commands
+	    cmds.download()
+	    cmds.wait_ready()
+	    if not vehicle.home_location:
+	        pass
+	# TODO set a timeout
+	# We have a home location.
+	return vehicle.home_location.__dict__
+
+"""
+Expects params as {'lat':-35.3, 'alt':584, 'lon':149.1}
+"""
+def _set_home_location(params):
+	if ('lat' and 'lon' and 'alt') not in params.keys():
+		return {"success": False} 
+	vehicle.home_location = LocationGlobal(lat=params['lat'],lon=params['lon'],alt=params['alt'])
+	return {"success": True}
 
 rpc_methods = ({'name':'shell','function':_shell}, 
 #               {'name':'status','function':show_status}, 
                {'name':'video_devices','function':_video_devices}, 
                {'name':'vehicle_attributes','function':_get_vehicle_attributes},
+			   {'name':'set_attributes','function':_set_vehicle_attributes},
+               {'name':'autopilot_attributes','function':_get_autopilot_attributes},
                {'name':'vehicle_parameters','function':_get_vehicle_parameters},
-#               {'name':'set_schedule','function':set_schedule}
+			   {'name':'set_parameters','function':_set_vehicle_parameters},
+
+               {'name':'home_location','function':_get_home_location},
+               {'name':'set_home_location','function':_set_home_location}
 )
 
 def message_handler(msg, msg_len):
@@ -163,10 +238,10 @@ def check_rpc_msg(req):
 
 def isanumber(x):
     try:
-        int(a)
+        int(x)
     except ValueError:
         try:
-            float(a)
+            float(x)
         except ValueError:
             return False
     return True
@@ -174,9 +249,6 @@ def isanumber(x):
 # --------------------
 # 
 # Entry point
-
-from dronekit import connect, VehicleMode
-
 
 
 def main(argv):
