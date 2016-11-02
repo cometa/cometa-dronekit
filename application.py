@@ -58,7 +58,7 @@ def main(argv):
 	cometa_port = config['cometa_port']
 	application_id = config['cometa_app']
 	# if not specified use the machine's MAC address as Cometa device ID
-	device_id = Runtime.get_mac_address()
+	device_id = Runtime.get_serial()
 
 	# ------------------------------------------------ #
 	print "Cometa client started.\r\nParams: cometa_server:", cometa_server, "cometa_port:", cometa_port, "application_id:", application_id, "device_id:", device_id
