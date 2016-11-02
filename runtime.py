@@ -204,3 +204,53 @@ class Runtime(object):
         else:
             print ("[%d] %s" % (klass.__systime, msg))
 
+    # Get list of camera devices
+    @classmethod
+    def list_camera_devices(klass):
+		"""
+		List all video devices and their names
+		"""
+		videodevs = ["/dev/" + x for x in os.listdir("/dev/") if x.startswith("video") ]
+
+		# Do ioctl dance to extract the name of the device
+		import fcntl
+		_IOC_NRBITS   =  8
+		_IOC_TYPEBITS =  8
+		_IOC_SIZEBITS = 14
+		_IOC_DIRBITS  =  2
+
+		_IOC_NRSHIFT = 0
+		_IOC_TYPESHIFT =(_IOC_NRSHIFT+_IOC_NRBITS)
+		_IOC_SIZESHIFT =(_IOC_TYPESHIFT+_IOC_TYPEBITS)
+		_IOC_DIRSHIFT  =(_IOC_SIZESHIFT+_IOC_SIZEBITS)
+
+		_IOC_NONE = 0
+		_IOC_WRITE = 1
+		_IOC_READ = 2
+		def _IOC(direction,type,nr,size):
+			return (((direction)  << _IOC_DIRSHIFT) |
+				((type) << _IOC_TYPESHIFT) |
+				((nr)   << _IOC_NRSHIFT) |
+				((size) << _IOC_SIZESHIFT))
+		def _IOR(type, number, size):
+			return _IOC(_IOC_READ, type, number, size)
+		def _IOW(type, number, size):
+			return _IOC(_IOC_WRITE, type, number, size)
+
+		sizeof_struct_v4l2_capability = (16 + 32 + 32 + 4 + 4 + 16)
+		VIDIOC_QUERYCAP = _IOR(ord('V'),  0, sizeof_struct_v4l2_capability)
+
+		import array
+		import struct
+		emptybuf = " " * (16 + 32 + 32 + 4 + 4 + 16) # sizeof(struct v4l2_capability)
+		buf = array.array('c', emptybuf)
+		cameranames = []
+		for dev in videodevs:
+			camera_dev = open(dev, "rw")
+			camera_fd = camera_dev.fileno()
+			fcntl.ioctl(camera_fd, VIDIOC_QUERYCAP, buf, 1)
+			cameranames.append(buf[16:48].tostring())
+#			bus_info = buf[48:80].tostring()
+			camera_dev.close()
+
+		return videodevs, cameranames
