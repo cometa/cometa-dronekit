@@ -253,4 +253,4 @@ class Runtime(object):
 #			bus_info = buf[48:80].tostring()
 			camera_dev.close()
 
-		return videodevs, cameranames
+		return [videodevs, cameranames]

@@ -15,53 +15,162 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from cometalib import CometaClient
 import time
 import sys, getopt
 import string
 import json
 import subprocess
-
 from uuid import getnode as get_mac
 from time import gmtime, strftime
 
 from runtime import Runtime
+from cometalib import CometaClient
+
+# JSON-RPC errors
+JSON_RPC_PARSE_ERROR = '{"jsonrpc": "2.0","error":{"code":-32700,"message":"Parse error"},"id": null}'
+JSON_RPC_INVALID_REQUEST = '{"jsonrpc": "2.0","error":{"code":-32600,"message":"Invalid Request"},"id":null}'
+
+JSON_RPC_METHOD_NOTFOUND_FMT_STR = '{"jsonrpc":"2.0","error":{"code": -32601,"message":"Method not found"},"id": %s}'
+JSON_RPC_METHOD_NOTFOUND_FMT_NUM = '{"jsonrpc":"2.0","error":{"code": -32601,"message":"Method not found"},"id": %d}'
+JSON_RPC_INVALID_PARAMS_FMT_STR = '{"jsonrpc":"2.0","error":{"code": -32602,"message":"Method not found"},"id": %s}'
+JSON_RPC_INVALID_PARAMS_FMT_NUM = '{"jsonrpc":"2.0","error":{"code": -32602,"message":"Method not found"},"id": %d}'
+JSON_RPC_INTERNAL_ERROR_FMT_STR = '{"jsonrpc":"2.0","error":{"code": -32603,"message":"Method not found"},"id": %s}'
+JSON_RPC_INTERNAL_ERROR_FMT_NUM = '{"jsonrpc":"2.0","error":{"code": -32602,"message":"Method not found"},"id": %d}'
+
+# shortcut to refer to the system log in Runtime
+Runtime.init_runtime()
+syslog = Runtime.syslog
+
+# --------------------
+# 
+# RPC Methods
+
+# @info Start a subprocess shell to execute the specified command and return its output.
+#
+# {"jsonrpc":"2.0","method":"shell","params":["/bin/cat /etc/hosts"],"id":1}
+#
+def _shell(params):
+    # check that params is a list
+    if not isinstance(params, list) or len(params) == 0:
+        return "Parameter must be a not empty list"
+    
+    command = params[0]
+    out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
+    return '\n' + out.decode()
+
+def _video_devices(params):
+	vdevices = Runtime.list_camera_devices()
+	ret = {}
+	ret['devices'] = vdevices[0]
+	ret['names'] = vdevices[1]
+	return ret
+# 	return str(vdevices).decode()
+
+rpc_methods = ({'name':'shell','function':_shell}, 
+#               {'name':'status','function':show_status}, 
+               {'name':'video_devices','function':_video_devices}, 
+#               {'name':'setpoint','function':setpoint},
+#               {'name':'get_schedule','function':get_schedule},
+#               {'name':'set_schedule','function':set_schedule}
+)
 
 def message_handler(msg, msg_len):
-	"""
-		The message handler is the Cometa receive callback. 
-		Every time the Cometa library receives a message for this device the message_handler is invoked.
-	"""
-	try:
-		c = json.loads(msg)
-	except Exception, e:
-		print "Error in parsing the message: ", msg
-		return "{\"msg\":\"Invalid JSON object.\"}"
+    """
+    The generic message handler for Cometa receive callback.
+    Invoked every time the Cometa object receives a JSON-RPC message for this device.
+    It returns the JSON-RPC result object to send back to the application that sent the request.
+    The rpc_methods tuple contains the mapping of names into functions.
+    """
+    #pdb.set_trace()
+    try:
+        req = json.loads(msg)
+    except:
+        # the message is not a json object
+        syslog("Received JSON-RPC invalid message (parse error): %s" % msg, escape=True)
+        return JSON_RPC_PARSE_ERROR
 
-	if 'cmd' in c:
-		print "Command received: ", c['cmd']	#DEBUG
-		command = c['cmd']
-		# execute the command in a shell on the device
-		out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
-		return out
-	else:
-		print "Invalid command."
-		return "{\"msg\":\"Invalid command.\"}"
+    # check the message is a proper JSON-RPC message
+    ret,id = check_rpc_msg(req)
+    if not ret:
+        if id and isanumber(id):
+            return JSON_RPC_INVALID_PARAMS_FMT_NUM % id
+        if id and isinstance(id, str):
+            return JSON_RPC_INVALID_PARAMS_FMT_STR % id
+        else:
+            return JSON_RPC_PARSE_ERROR
+
+    syslog("Received JSON-RPC message: %s" % msg, escape=True)
+
+    method = req['method']
+    func = None
+    # check if the method is in the registered list
+    for m in rpc_methods:
+        if m['name'] == method:
+            func = m['function']
+            break
+
+    if func == None:
+        return JSON_RPC_INVALID_REQUEST
+    # call the method
+    result = func(req['params'])
+    # build the response object
+    reply = {}
+    reply['jsonrpc'] = "2.0"
+    reply['result'] = result
+    reply['id'] = req['id']
+
+    return json.dumps(reply)
+
+# --------------------
+# 
+# Utility functions
+
+def check_rpc_msg(req):
+    ret = False
+    id = None
+    k = req.keys()
+    # check presence of required id attribute
+    if 'id' in k:
+        id = req['id']
+    else:
+        return ret, id
+    # check object length
+    if (len(k) != 4):
+        return ret, id
+    # check presence of required attributes
+    if (not 'jsonrpc' in k) or (not 'method' in k) or (not 'params' in k):
+        return ret, id
+    # check for version
+    if req['jsonrpc'] != "2.0":
+        return ret, id
+    # valid request
+    return True,id
+
+def isanumber(x):
+    try:
+        int(a)
+    except ValueError:
+        try:
+            float(a)
+        except ValueError:
+            return False
+    return True
+
+# --------------------
+# 
+# Entry point
 	
 def main(argv):
-
-	Runtime.init_runtime()
-	syslog = Runtime.syslog
 	config = Runtime.read_config()
 
 	cometa_server = config['cometa_server']
 	cometa_port = config['cometa_port']
 	application_id = config['cometa_app']
-	# if not specified use the machine's MAC address as Cometa device ID
+	# use the machine's MAC address as Cometa device ID
 	device_id = Runtime.get_serial()
 
 	# ------------------------------------------------ #
-	print "Cometa client started.\r\nParams: cometa_server:", cometa_server, "cometa_port:", cometa_port, "application_id:", application_id, "device_id:", device_id
+	print "Cometa client started.\r\ncometa_server:", cometa_server, "\r\ncometa_port:", cometa_port, "\r\napplication_id:", application_id, "\r\ndevice_id:", device_id
 
 	# Instantiate a Cometa object
 	com = CometaClient(cometa_server, cometa_port, application_id)
@@ -93,11 +202,7 @@ def main(argv):
 	# Application main loop.
 	while True:
 		"""
-			Send a data event with the device ID and the current time upstream to the Cometa
-			server every minute. This is to demonstrate use of the asynchronous data event messages.
-			Once a data event message is received by Cometa, the message is propagated to all opened 
-			device Websockets. If a Webhook for the application is specified in the Cometa configuration
-			file /etc/cometa.conf the message is also posted to the configured Webhook.
+		Send a telemetry data event upstream. 
 		"""
 		time.sleep(60)
 		now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
