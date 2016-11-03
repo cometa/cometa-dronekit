@@ -53,11 +53,17 @@ syslog = Runtime.syslog
 #
 def _shell(params):
     # check that params is a list
-    if not isinstance(params, list) or len(params) == 0:
-        return "Parameter must be a not empty list"    
-    command = params[0]
-    out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
-    return '\n' + out.decode()
+	if not isinstance(params, list) or len(params) == 0:
+		return "Parameter must be a not empty list"    
+	command = params[0]
+	try:
+		subprocess.check_call(command,shell=True)
+		out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
+		return '\n' + out.decode()
+
+	except Exception, e:
+		print e
+		return "{\"msg\":\"Invalid command.\"}"
 
 def _video_devices(params):
 	vdevices = Runtime.list_camera_devices()
@@ -184,9 +190,9 @@ def message_handler(msg, msg_len):
     try:
         req = json.loads(msg)
     except:
-        # the message is not a json object
-        syslog("Received JSON-RPC invalid message (parse error): %s" % msg, escape=True)
-        return JSON_RPC_PARSE_ERROR
+		# the message is not a json object
+		syslog("Received JSON-RPC invalid message (parse error): %s" % msg, escape=True)
+		return JSON_RPC_PARSE_ERROR
 
     # check the message is a proper JSON-RPC message
     ret,id = check_rpc_msg(req)
@@ -306,7 +312,7 @@ def main(argv):
 	print "Cometa client started.\r\ncometa_server:", cometa_server, "\r\ncometa_port:", cometa_port, "\r\napplication_id:", application_id, "\r\ndevice_id:", device_id
 
 	# Instantiate a Cometa object
-	com = CometaClient(cometa_server, cometa_port, application_id)
+	com = CometaClient(cometa_server, cometa_port, application_id, config['cometa']['ssl'])
 	# Set debug flag
 	com.debug = config['app_params']['debug']
 
@@ -345,7 +351,7 @@ def main(argv):
 
 		#now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
 		#msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
-
+		continue #DEBUG
 		if com.send_data(str(msg)) < 0:
 			print "Error in sending data."
 		else:
