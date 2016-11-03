@@ -23,12 +23,13 @@ import ssl
 # From http-parser (0.8.3)
 # pip install http-parser
 from http_parser.parser import HttpParser
+import pdb
 
 class CometaClient(object):
 	"""Connect a device to the Cometa infrastructure"""
 	errors = {0:'ok', 1:'timeout', 2:'network error', 3:'protocol error', 4:'authorization error', 5:'wrong parameters', 9:'internal error'} 
 
-	def __init__(self,server, port, application_id):
+	def __init__(self,server, port, application_id, use_ssl):
 		"""
 		The Cometa instance constructor.
 
@@ -42,6 +43,7 @@ class CometaClient(object):
 		self._server = server
 		self._port = port
 		self._app_id = application_id
+		self._use_ssl = use_ssl
 		self._message_cb = None
 
 		self._device_id = ""
@@ -67,7 +69,10 @@ class CometaClient(object):
 		self._platform = device_info
 		self._hparser = HttpParser()
 		tsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self._sock = tsock #ssl.wrap_socket(tsock)
+		if self._use_ssl:
+			self._sock = ssl.wrap_socket(tsock, ssl_version=ssl.PROTOCOL_SSLv23,  ciphers="AES256-GCM-SHA384")
+		else:
+			self._sock = tsock
 		try:
 			self._sock.connect((self._server, self._port))
 			sendBuf="POST /v1/applications/%s/devices/%s HTTP/1.1\r\nHost: api.cometa.io\r\nContent-Length:%d\r\n\r\n%s" % (self._app_id,device_id,len(device_info),device_info)
@@ -84,14 +89,21 @@ class CometaClient(object):
 
 				if self._hparser.is_headers_complete():
 					if self.debug:
-						print "connection for device %s complete" % (device_id)
+						print "connection for device %s headers received" % (device_id)
 						print self._hparser.get_headers()
+
+				if self._hparser.is_partial_body():
+					recvBuf = self._hparser.recv_body()
+					if self.debug:
+						print "connection for device %s body received" % (device_id)
+						print recvBuf					
+					#TODO: check for error in connecting, i.e. 403 already connected
+
 					# reading the attach complete message from the server  
 					# i.e. {"msg":"200 OK","heartbeat":60,"timestamp":1441382935}
-					recvBuf = self._hparser.recv_body()
-					#TODO: check for error in connecting, i.e. 403 already connected
 					if len(recvBuf) < 16 or recvBuf[1:12] != '"msg":"200"':
 						self.error = 5
+						print "Error in string from server; %s" % recvBuf
 						return recvBuf
 
 					# reset error
@@ -105,18 +117,22 @@ class CometaClient(object):
 						self._reconnecting = False
 						return recvBuf
 
-					# start the hearbeat thread
+					if self.debug:
+						print "connection for device %s completed" % (device_id)
+											# start the hearbeat thread
 					self._thbeat = threading.Thread(target=self._heartbeat)
 					self._thbeat.daemon = True
 					self._thbeat.start()
 						
 					# start the receive thread
+					#time.sleep(2)
 					self._trecv = threading.Thread(target=self._receive)
 					self._trecv.daemon = True	# force to exit on SIGINT
 					self._trecv.start()
 
+
 					return recvBuf
-		except  Exception, e:
+		except Exception, e:
 			print e
 			self.error = 2
 			return
@@ -185,7 +201,6 @@ class CometaClient(object):
 		"""
 		if self.debug:
 			print "Receive thread started.\r"
-		msg = ""
 		while True:
 			ready_to_read, ready_to_write, in_error = select.select([self._sock.fileno()],[],[self._sock.fileno()], 15)
 
@@ -212,6 +227,7 @@ class CometaClient(object):
 				try:
 					data = self._sock.recv(1024)
 				except Exception, e:
+					print e
 					pass
 
 			if not data:
@@ -234,18 +250,16 @@ class CometaClient(object):
 					print "Device attached to Cometa.", ret				
 				continue
 
-			msg = msg.join(data)
-			self._hparser.execute(msg, len(msg))
+			if self.debug:
+				print "** received: %s (%d)" % (data, len(data))			
+			self._hparser.execute(data, len(data))
 			if self._hparser.is_partial_body():
+				to_send = self._hparser.recv_body()
+				# pdb.set_trace()
 				# the payload contains a HTTP chunk
-				lines = msg.split('\r\n')
-				if len(lines) == 1:
-					continue
-				msg_len = lines[0]	# first line with body length
-				msg_body = lines[1]	# second line with body
 				if self._message_cb:
 					# invoke the user callback 
-					reply = self._message_cb(msg_body, msg_len)
+					reply = self._message_cb(to_send, len(to_send))
 				else:
 					reply = ""
 				if self.debug:
