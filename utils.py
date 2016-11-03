@@ -41,14 +41,14 @@ The methods are approximations only, and may be less accurate over longer distan
 to the Earth's poles.
 
 Specifically, it provides:
-* get_location_metres - Get LocationGlobal (decimal degrees) at distance (m) North & East of a given LocationGlobal.
-* get_distance_metres - Get the distance between two LocationGlobal objects in metres
+* get_location_meters - Get LocationGlobal (decimal degrees) at distance (m) North & East of a given LocationGlobal.
+* get_distance_meters - Get the distance between two LocationGlobal objects in metres
 * get_bearing - Get the bearing in degrees to a LocationGlobal
 """
 
-def get_location_metres(original_location, dNorth, dEast):
+def get_location_meters(original_location, dNorth, dEast):
     """
-    Returns a LocationGlobal object containing the latitude/longitude `dNorth` and `dEast` metres from the 
+    Returns a LocationGlobal object containing the latitude/longitude `dNorth` and `dEast` meters from the 
     specified `original_location`. The returned LocationGlobal has the same `alt` value
     as `original_location`.
 
@@ -78,9 +78,9 @@ def get_location_metres(original_location, dNorth, dEast):
     return targetlocation;
 
 
-def get_distance_metres(aLocation1, aLocation2):
+def get_distance_meters(aLocation1, aLocation2):
     """
-    Returns the ground distance in metres between two LocationGlobal objects.
+    Returns the ground distance in meters between two LocationGlobal objects.
 
     This method is an approximation, and will not be accurate over large distances and close to the 
     earth's poles. It comes from the ArduPilot test code: 
