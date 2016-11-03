@@ -26,7 +26,8 @@ from time import gmtime, strftime
 from runtime import Runtime
 from cometalib import CometaClient
 
-from dronekit import connect, VehicleMode, LocationGlobal, LocationGlobalRelative
+from dronekit import connect, VehicleMode, LocationGlobal, LocationGlobalRelative, Command
+from pymavlink import mavutil
 import utils
 
 # JSON-RPC errors
@@ -61,7 +62,6 @@ def _shell(params):
 		subprocess.check_call(command,shell=True)
 		out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
 		return '\n' + out.decode()
-
 	except Exception, e:
 		print e
 		return "{\"msg\":\"Invalid command.\"}"
@@ -110,8 +110,12 @@ def _get_vehicle_attributes(params):
 Expects an object such as {'armed': True} or {'airspeed':3.2} or {'mode':'GUIDED'}
 """
 def _set_vehicle_attributes(params):
-	if type(params) is not dict:
-		return {"success": False}
+    if type(params) is not dict:
+        return {"success": False}
+    allowed = ('armed','airspeed','groundspeed','mode')
+    for x in params:
+        if x not in allowed:
+            return {"success": False}        
 	if 'armed' in params.keys():
 		vehicle.armed = params['armed']
 	if 'airspeed' in params.keys():
@@ -187,7 +191,7 @@ Vehicle takeoff to the specified altitude.
 def _takeoff(params):
 	if type(params) is not dict:
 		return {"success": False}
-	if ('lat') not in params.keys():
+	if ('alt') not in params.keys():
 		return {"success": False}
 	vehicle.simple_takeoff(params['alt'])
 
