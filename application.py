@@ -501,7 +501,7 @@ def message_handler(msg, msg_len):
         else:
             return JSON_RPC_PARSE_ERROR
 
-    syslog("Received JSON-RPC message: %s" % msg, escape=True)
+    syslog("JSON-RPC: %s" % msg, escape=True)
 
     method = req['method']
     func = None
@@ -584,7 +584,7 @@ def main(argv):
 	com.bind_cb(message_handler)
 
 	# Attach the device to Cometa.
-	ret = com.attach(device_id, "DroneKit")
+	ret = com.attach(device_id, "%s" % vehicle.version)
 	if com.error != 0:
 		print "(FATAL) Error in attaching to Cometa.", com.perror()
 		sys.exit(2)

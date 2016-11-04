@@ -43,6 +43,7 @@ class Runtime(object):
 
     # Internal system time - resolution 1Hz
     __systime = 0
+    __has_systime = True
 
     # System status
     __status = "unknown"
@@ -58,12 +59,14 @@ class Runtime(object):
 
     # Complete class initialization after loading.
     @classmethod
-    def init_runtime(klass):
-        # start the update systime thread
-        if klass.__thtime == None:
-            klass.__thtime = threading.Thread(target=klass._update_systime)
-            klass.__thtime.daemon = True  # force to exit on SIGINT
-            klass.__thtime.start()
+    def init_runtime(klass, systime=True):
+        if not systime:
+            # start the update systime thread for runtimes that don't have built in timer
+            if klass.__thtime == None:
+                klass.__thtime = threading.Thread(target=klass._update_systime)
+                klass.__thtime.daemon = True  # force to exit on SIGINT
+                klass.__thtime.start()
+                klass.__has_systime = systime
         klass.__status = "OK"
     # 
     #-----------------------------------------------
@@ -89,7 +92,10 @@ class Runtime(object):
     # Get current systime
     @classmethod
     def get_systime(klass):
-        return klass.__systime
+        if klass.__has_systime:
+            return int(time.time())
+        else:
+            return klass.__systime
 
     # Get host systime
     @classmethod
@@ -200,9 +206,9 @@ class Runtime(object):
         """
         if escape:
             #print ("[%d] %s" % (klass.__systime, msg.replace(u'\n', u'#015').replace(u'\r', u'#012')))
-            print ("[%d] %s" % (klass.__systime, msg.replace('\n', '#015').replace('\r', '#012')))
+            print ("[%d] %s" % (klass.get_systime(), msg.replace('\n', '#015').replace('\r', '#012')))
         else:
-            print ("[%d] %s" % (klass.__systime, msg))
+            print ("[%d] %s" % (klass.get_systime(), msg))
 
     # Get list of camera devices
     @classmethod
