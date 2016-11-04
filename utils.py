@@ -1,6 +1,7 @@
 # --------------------
 # 
 # Utility functions
+
 def check_rpc_msg(req):
     ret = False
     id = None

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""
+"""Cometa agent for DroneKit.
+
 Author: Marco Graziano
 """
 __license__ = """
@@ -49,131 +50,152 @@ syslog = Runtime.syslog
 # 
 # RPC Methods
 
-# @info Start a subprocess shell to execute the specified command and return its output.
-#
-# {"jsonrpc":"2.0","method":"shell","params":["/bin/cat /etc/hosts"],"id":1}
-#
 def _shell(params):
+    """Start a subprocess shell to execute the specified command and return its output.
+
+    params - a one element list ["/bin/cat /etc/hosts"]
+    """
+
     # check that params is a list
-	if not isinstance(params, list) or len(params) == 0:
-		return "Parameter must be a not empty list"    
-	command = params[0]
-	try:
-		subprocess.check_call(command,shell=True)
-		out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
-		return '\n' + out.decode()
-	except Exception, e:
-		print e
-		return "{\"msg\":\"Invalid command.\"}"
+    if not isinstance(params, list) or len(params) == 0:
+       return "Parameter must be a not empty list"    
+    command = params[0]
+    try:
+        subprocess.check_call(command,shell=True)
+        out = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
+        return '\n' + out.decode()
+    except Exception, e:
+        print e
+        return "{\"msg\":\"Invalid command.\"}"
 
 def _video_devices(params):
-	vdevices = Runtime.list_camera_devices()
-	ret = {}
-	ret['devices'] = vdevices[0]
-	ret['names'] = vdevices[1]
-	return ret
+    """List available video devices (v4l)."""
+
+    vdevices = Runtime.list_camera_devices()
+    ret = {}
+    ret['devices'] = vdevices[0]
+    ret['names'] = vdevices[1]
+    return ret
 
 def _get_autopilot_attributes(params):
-	ret = {}
-	ret['firmware'] = {'version':"%s" % vehicle.version, 'major':vehicle.version.major, 'minor':vehicle.version.minor, 'patch':vehicle.version.patch}
-	ret['release'] = {'type': vehicle.version.release_type(), 'version': vehicle.version.release_version(), 'stable': vehicle.version.is_stable()}
-	ret['capabilities'] = vehicle.capabilities.__dict__
-	return ret
+    """Get autopilot attributes."""
+
+    ret = {}
+    ret['firmware'] = {'version':"%s" % vehicle.version, 'major':vehicle.version.major, 'minor':vehicle.version.minor, 'patch':vehicle.version.patch}
+    ret['release'] = {'type': vehicle.version.release_type(), 'version': vehicle.version.release_version(), 'stable': vehicle.version.is_stable()}
+    ret['capabilities'] = vehicle.capabilities.__dict__
+    return ret
 
 global attribute_names
 attribute_names = ('attitude','location','velocity','gps','gimbal','battery','ekf_ok','last_heartbeat','rangefinder','heading','armable','state','groundspeed','airspeed','mode','armed')
 
 def _get_vehicle_attributes(params):
-	ret = {}
-	ret['attitude'] = vehicle.attitude.__dict__
-	f = vehicle.location.global_frame
-	r = vehicle.location.global_relative_frame
-	l = vehicle.location.local_frame
-	ret['location'] = {'global':{'lat':f.lat,'lon':f.lon,'alt':f.alt}, 'relative':{'lat':r.lat,'lon':r.lon,'alt':r.alt},'local':{'north':l.north,'east':l.east,'down':l.down}}
-	ret['velocity'] = vehicle.velocity
-	ret['gps'] = vehicle.gps_0.__dict__
-	ret['gimbal'] = {'pitch' : vehicle.gimbal._pitch, 'yaw': vehicle.gimbal._yaw, 'roll': vehicle.gimbal._roll}
-	ret['battery'] = vehicle.battery.__dict__
-	ret['ekf_ok'] = vehicle.ekf_ok
-	ret['last_heartbeat'] = vehicle.last_heartbeat
-	ret['rangefinder'] =  vehicle.rangefinder.__dict__
-	ret['heading'] = vehicle.heading
-	ret['armable'] = vehicle.is_armable
-	ret['state'] =vehicle.system_status.state
-	ret['groundspeed'] = vehicle.groundspeed
-	ret['airspeed'] = vehicle.airspeed
-	ret['mode'] = vehicle.mode.name
-	ret['armed'] = vehicle.armed
-	return ret
+    """Get all vehicle attributes."""
 
-"""
-Expects an object such as {'armed': True} or {'airspeed':3.2} or {'mode':'GUIDED'}
-"""
+    ret = {}
+    ret['attitude'] = vehicle.attitude.__dict__
+    f = vehicle.location.global_frame
+    r = vehicle.location.global_relative_frame
+    l = vehicle.location.local_frame
+    ret['location'] = {'global':{'lat':f.lat,'lon':f.lon,'alt':f.alt}, 'relative':{'lat':r.lat,'lon':r.lon,'alt':r.alt},'local':{'north':l.north,'east':l.east,'down':l.down}}
+    ret['velocity'] = vehicle.velocity
+    ret['gps'] = vehicle.gps_0.__dict__
+    ret['gimbal'] = {'pitch' : vehicle.gimbal._pitch, 'yaw': vehicle.gimbal._yaw, 'roll': vehicle.gimbal._roll}
+    ret['battery'] = vehicle.battery.__dict__
+    ret['ekf_ok'] = vehicle.ekf_ok
+    ret['last_heartbeat'] = vehicle.last_heartbeat
+    ret['rangefinder'] =  vehicle.rangefinder.__dict__
+    ret['heading'] = vehicle.heading
+    ret['armable'] = vehicle.is_armable
+    ret['state'] =vehicle.system_status.state
+    ret['groundspeed'] = vehicle.groundspeed
+    ret['airspeed'] = vehicle.airspeed
+    ret['mode'] = vehicle.mode.name
+    ret['armed'] = vehicle.armed
+    return ret
+
+
 def _set_vehicle_attributes(params):
+    """Set one or more vehicle attributes. Writable attributes 'armed','airspeed','groundspeed','mode'.
+
+    params - JSON object {'armed': True} or {'airspeed':3.2} or {'mode':'GUIDED'}
+    """
+
     if type(params) is not dict:
         return {"success": False}
     allowed = ('armed','airspeed','groundspeed','mode')
     for x in params:
         if x not in allowed:
             return {"success": False}        
-	if 'armed' in params.keys():
-		vehicle.armed = params['armed']
-	if 'airspeed' in params.keys():
-		vehicle.airspeed = params['airspeed']
-	if 'groundspeed' in params.keys():
-		vehicle.groundspeed = params['groundspeed']
-	if 'mode' in params.keys():
-		vehicle.mode = VehicleMode(params['mode'])
-	return {"success": True}
+    if 'armed' in params.keys():
+        vehicle.armed = params['armed']
+    if 'airspeed' in params.keys():
+        vehicle.airspeed = params['airspeed']
+    if 'groundspeed' in params.keys():
+        vehicle.groundspeed = params['groundspeed']
+    if 'mode' in params.keys():
+        vehicle.mode = VehicleMode(params['mode'])
+    return {"success": True}
 
 def _get_vehicle_parameters(params):
-	return vehicle.parameters.__dict__['_attribute_cache']
+    """Get vehicle parameters."""
 
-"""
-Expects params as  {'key':'THR_MIN', 'value': 100}
-"""
+    return vehicle.parameters.__dict__['_attribute_cache']
+
 def _set_vehicle_parameters(params):
-	if ('key' and 'value') not in params.keys():
-		return {"success": False}
-	vehicle.parameters[params['key']] = params['value']
-	return {"success": True}
+    """Set one or more vehicle parameters.
+
+    params - JSON object {'key':'THR_MIN', 'value': 100}
+    """
+
+    if ('key' and 'value') not in params.keys():
+        return {"success": False}
+    vehicle.parameters[params['key']] = params['value']
+    return {"success": True}
 
 def _get_home_location(params):
-	# Get Vehicle Home location - will be `None` until first set by autopilot
-	while not vehicle.home_location:
-	    cmds = vehicle.commands
-	    cmds.download()
-	    cmds.wait_ready()
-	    if not vehicle.home_location:
-	        pass
-	# TODO set a timeout
-	# We have a home location.
-	return vehicle.home_location.__dict__
+    """Get Vehicle home location - will be `None` until first set by autopilot."""
 
-"""
-Expects params as {'lat':-35.3, 'alt':584, 'lon':149.1}
-"""
+    while not vehicle.home_location:
+        cmds = vehicle.commands
+        cmds.download()
+        cmds.wait_ready()
+        if not vehicle.home_location:
+            pass
+    # TODO set a timeout
+    # return the home location.
+    return vehicle.home_location.__dict__
+
 def _set_home_location(params):
-	if ('lat' and 'lon' and 'alt') not in params.keys():
-		return {"success": False} 
-	vehicle.home_location = LocationGlobal(lat=params['lat'],lon=params['lon'],alt=params['alt'])
-	return {"success": True}
+    """Set home location in global coordinates.
 
-"""
-Expects an object like {'period':5} 
-"""
+    params - JSON object {'lat':-35.3, 'alt':584, 'lon':149.1}
+    """
+
+    if ('lat' and 'lon' and 'alt') not in params.keys():
+        return {"success": False} 
+    vehicle.home_location = LocationGlobal(lat=params['lat'],lon=params['lon'],alt=params['alt'])
+    return {"success": True}
+
 def _set_telemetry_period(params):
-	if type(params) is not dict or 'period' not in params.keys():
-		return {"success": False}
-	if params['period'] <= 0:
-		return {"success": False}
-	config['app_params']['telemetry_period'] = params['period']
-	return {"success": True}
+    """Set telemetry period in seconds.
 
-"""
-Set the telemetry params to a new tuple. Pass an array of attribute names to be compatible with JSON/RPC.
-"""
+    params - JSON object {'period':5} 
+    """
+
+    if type(params) is not dict or 'period' not in params.keys():
+        return {"success": False}
+    if params['period'] <= 0:
+        return {"success": False}
+    config['app_params']['telemetry_period'] = params['period']
+    return {"success": True}
+
 def _set_telemetry_attributes(params):
+    """Set the telemetry params to a new tuple. 
+
+    params - An array of attribute names in the allowed set.
+    """
+
     if type(params) is not list:
         return {"success": False}
     tparams = tuple(params)
@@ -184,65 +206,61 @@ def _set_telemetry_attributes(params):
     telemetry_attributes_names = tparams
     return {"success": True}
 
-"""
-Vehicle takeoff to the specified altitude.
-{"alt": 4.3}
-"""
 def _takeoff(params):
-	if type(params) is not dict:
-		return {"success": False}
-	if ('alt') not in params.keys():
-		return {"success": False}
-	vehicle.simple_takeoff(params['alt'])
+    """Vehicle takeoff to the specified altitude.
+
+    params - JSON object {"alt": 4.3}
+    """
+
+    if type(params) is not dict:
+        return {"success": False}
+    if ('alt') not in params.keys():
+        return {"success": False}
+    vehicle.simple_takeoff(params['alt'])
     return {"success": True}
 
-"""
-Moves the vehicle to the absolute or relative position specified.
-{"lat": -34.2, "lon": 149.2, "alt" = 3.0, "relative": true}
-"""
 def _goto(params):
-	if type(params) is not dict:
-		return {"success": False}
-	if ('lat' and 'lon' and 'alt' and 'relative') not in params.keys():
-		return {"success": False}
-	if relative:
-		dest = LocationGlobalRelative(lat, lon, alt)
-	else:
-		dest = LocationGlobal(params['lat'], params['lon'], params['alt'])
-	vehicle.simple_goto(dest)
-	return {"success": True}
+    """Move the vehicle to the absolute or relative position specified.
 
-"""
-Moves the vehicle to the destination North and East meters of the current position.
-{"dNorth": 1.5, "dEast": 10.2}
-"""
-def _goto_destination(params):
-	if type(params) is not dict:
-		return {"success": False}
-	if ('dNorth' and 'dEast') not in params.keys():
-		return {"success": False}
-	curLocation = vehicle.location.global_relative_frame
-	dest = utils.get_location_meters(curLocation, dNorth, dEast)
-	vehicle.simple_goto(dest)
-	return {"success": True}
-
-"""
-Moves the vehicle to the global position specified.
-{"lat": -34.2, "lon": 149.2, "alt" = 3.0}
-"""
-def _goto_position_target_global_int(params):
+    params - JSON object {"lat": -34.2, "lon": 149.2, "alt" = 3.0, "relative": true}
     """
-    Send SET_POSITION_TARGET_GLOBAL_INT command to request the vehicle fly to a specified LocationGlobal.
 
-    For more information see: https://pixhawk.ethz.ch/mavlink/#SET_POSITION_TARGET_GLOBAL_INT
-
-    See the above link for information on the type_mask (0=enable, 1=ignore). 
-    At time of writing, acceleration and yaw bits are ignored.
-    """
     if type(params) is not dict:
-		return {"success": False}
+        return {"success": False}
+    if ('lat' and 'lon' and 'alt' and 'relative') not in params.keys():
+        return {"success": False}
+    if relative:
+        dest = LocationGlobalRelative(lat, lon, alt)
+    else:
+        dest = LocationGlobal(params['lat'], params['lon'], params['alt'])
+    vehicle.simple_goto(dest)
+    return {"success": True}
+
+def _goto_destination(params):
+    """Move the vehicle to the destination North and East meters of the current position.
+
+    params - JSON object {"dNorth": 1.5, "dEast": 10.2}
+    """
+
+    if type(params) is not dict:
+        return {"success": False}
+    if ('dNorth' and 'dEast') not in params.keys():
+        return {"success": False}
+    curLocation = vehicle.location.global_relative_frame
+    dest = utils.get_location_meters(curLocation, dNorth, dEast)
+    vehicle.simple_goto(dest)
+    return {"success": True}
+
+def _goto_position_target_global_int(params):
+    """Move the vehicle to the global position specified.
+
+    params - JSON object {"lat": -34.2, "lon": 149.2, "alt" = 3.0}
+    """
+
+    if type(params) is not dict:
+        return {"success": False}
     if ('lat' and 'lon' and 'alt') not in params.keys():
-		return {"success": False}    
+        return {"success": False}    
     lat = params['lat']
     lon = params['lon']
     alt = params['alt']
@@ -263,30 +281,16 @@ def _goto_position_target_global_int(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
-Moves the vehicle to the global position specified.
-{"north": -34.2, "east": 149.2, "down" = 3.0}
-"""
 def _goto_position_target_local_ned(params):
-    """	
-    Send SET_POSITION_TARGET_LOCAL_NED command to request the vehicle fly to a specified 
-    location in the North, East, Down frame.
+    """Move the vehicle to the global position specified.
 
-    It is important to remember that in this frame, positive altitudes are entered as negative 
-    "Down" values. So if down is "10", this will be 10 metres below the home altitude.
-
-    Starting from AC3.3 the method respects the frame setting. Prior to that the frame was
-    ignored. For more information see: 
-    http://dev.ardupilot.com/wiki/copter-commands-in-guided-mode/#set_position_target_local_ned
-
-    See the above link for information on the type_mask (0=enable, 1=ignore). 
-    At time of writing, acceleration and yaw bits are ignored.
-
+    params - JSON object {"north": -34.2, "east": 149.2, "down" = 3.0}
     """
+
     if type(params) is not dict:
-		return {"success": False}
+        return {"success": False}
     if ('north' and 'east' and 'down') not in params.keys():
-		return {"success": False}  
+        return {"success": False}  
     msg = vehicle.message_factory.set_position_target_local_ned_encode(
         0,       # time_boot_ms (not used)
         0, 0,    # target system, target component
@@ -300,28 +304,16 @@ def _goto_position_target_local_ned(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
- Point vehicle at a specified heading (in degrees) relative to the direction or absolut according to the specified value.
- {"heading": 45.0, relative": false}
-"""
 def _condition_yaw(params):
+    """Point vehicle at a specified heading (in degrees) relative to the direction or absolut according to the specified value.
+    
+    params - JSON object {"heading": 45.0, relative": false}
     """
-    Send MAV_CMD_CONDITION_YAW message to point vehicle at a specified heading (in degrees).
 
-    This method sets an absolute heading by default, but you can set the `relative` parameter
-    to `True` to set yaw relative to the current yaw heading.
-
-    By default the yaw of the vehicle will follow the direction of travel. After setting 
-    the yaw using this function there is no way to return to the default yaw "follow direction 
-    of travel" behaviour (https://github.com/diydrones/ardupilot/issues/2427)
-
-    For more information see: 
-    http://copter.ardupilot.com/wiki/common-mavlink-mission-command-messages-mav_cmd/#mav_cmd_condition_yaw
-    """
     if type(params) is not dict:
-		return {"success": False}
+        return {"success": False}
     if ('heading' and 'relative') not in params.keys():
-		return {"success": False} 
+        return {"success": False} 
     if params['relative']:
         is_relative = 1 #yaw relative to direction of travel
     else:
@@ -340,23 +332,16 @@ def _condition_yaw(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
-Point the camera at the global position specified.
-{"lat": -34.2, "lon": 149.2, "alt" = 3.0}
-"""
 def _point_camera(params):
-    """
-    Send MAV_CMD_DO_SET_ROI message to point camera gimbal at a 
-    specified region of interest (LocationGlobal).
-    The vehicle may also turn to face the ROI.
+    """Point the camera at the global position specified.
 
-    For more information see: 
-    http://copter.ardupilot.com/common-mavlink-mission-command-messages-mav_cmd/#mav_cmd_do_set_roi
-    """
+    params - JSON object {"lat": -34.2, "lon": 149.2, "alt" = 3.0}
+    """   
+
     if type(params) is not dict:
-		return {"success": False}
+        return {"success": False}
     if ('lat' and 'lon' and 'alt') not in params.keys():
-		return {"success": False}    
+        return {"success": False}    
     lat = params['lat']
     lon = params['lon']
     alt = params['alt']
@@ -374,26 +359,12 @@ def _point_camera(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
-Move vehicle in direction based on specified velocity vectors in the local frame.
-{"velocity_x": 2.3, "velocity_y": 5.0, "velocity_z":0.2}
-"""
 def _send_ned_velocity(params):
-    """
-    Move vehicle in direction based on specified velocity vectors.
+    """Move the vehicle based on specified velocity vectors in the local frame.
 
-    This uses the SET_POSITION_TARGET_LOCAL_NED command with a type mask enabling only 
-    velocity components 
-    (http://dev.ardupilot.com/wiki/copter-commands-in-guided-mode/#set_position_target_local_ned).
-    
-    Note that from AC3.3 the message should be re-sent every second (after about 3 seconds
-    with no message the velocity will drop back to zero). In AC3.2.1 and earlier the specified
-    velocity persists until it is canceled. The code below should work on either version 
-    (sending the message multiple times does not cause problems).
-    
-    See the above link for information on the type_mask (0=enable, 1=ignore). 
-    At time of writing, acceleration and yaw bits are ignored.
+    params - JSON object {"velocity_x": 2.3, "velocity_y": 5.0, "velocity_z":0.2}
     """
+
     if type(params) is not dict:
         return {"success": False}
     if ('velocity_x' and 'velocity_y' and 'velocity_z') not in params.keys():
@@ -411,26 +382,12 @@ def _send_ned_velocity(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
-Move vehicle in direction based on specified velocity vectors in the global frame.
-{"velocity_x": 2.3, "velocity_y": 5.0, "velocity_z":0.2}
-"""
 def _send_global_velocity(params):
-    """
-    Move vehicle in direction based on specified velocity vectors.
+    """Move the vehicle based on specified velocity vectors in the global frame.
 
-    This uses the SET_POSITION_TARGET_GLOBAL_INT command with type mask enabling only 
-    velocity components 
-    (http://dev.ardupilot.com/wiki/copter-commands-in-guided-mode/#set_position_target_global_int).
-    
-    Note that from AC3.3 the message should be re-sent every second (after about 3 seconds
-    with no message the velocity will drop back to zero). In AC3.2.1 and earlier the specified
-    velocity persists until it is canceled. The code below should work on either version 
-    (sending the message multiple times does not cause problems).
-    
-    See the above link for information on the type_mask (0=enable, 1=ignore). 
-    At time of writing, acceleration and yaw bits are ignored.
+    params - JSON object {"velocity_x": 2.3, "velocity_y": 5.0, "velocity_z":0.2}
     """
+
     if type(params) is not dict:
         return {"success": False}
     if ('velocity_x' and 'velocity_y' and 'velocity_z') not in params.keys():
@@ -489,14 +446,13 @@ def _start_mission(params):
 
 global rpc_methods
 rpc_methods = ({'name':'shell','function':_shell}, 
-#               {'name':'status','function':show_status}, 
                {'name':'video_devices','function':_video_devices}, 
                {'name':'vehicle_attributes','function':_get_vehicle_attributes},
-			   {'name':'set_attributes','function':_set_vehicle_attributes},
+               {'name':'set_attributes','function':_set_vehicle_attributes},
                {'name':'autopilot_attributes','function':_get_autopilot_attributes},
                {'name':'vehicle_parameters','function':_get_vehicle_parameters},
-			   {'name':'set_parameters','function':_set_vehicle_parameters},
-			   {'name':'set_telemetry_period','function':_set_telemetry_period},
+               {'name':'set_parameters','function':_set_vehicle_parameters},
+               {'name':'set_telemetry_period','function':_set_telemetry_period},
                {'name':'set_telemetry_attributes','function':_set_telemetry_attributes},
                {'name':'home_location','function':_get_home_location},
                {'name':'set_home_location','function':_set_home_location},
@@ -525,9 +481,9 @@ def message_handler(msg, msg_len):
     try:
         req = json.loads(msg)
     except:
-		# the message is not a json object
-		syslog("Received JSON-RPC invalid message (parse error): %s" % msg, escape=True)
-		return JSON_RPC_PARSE_ERROR
+        # the message is not a json object
+        syslog("Received JSON-RPC invalid message (parse error): %s" % msg, escape=True)
+        return JSON_RPC_PARSE_ERROR
 
     # check the message is a proper JSON-RPC message
     ret,id = utils.check_rpc_msg(req)
@@ -571,11 +527,11 @@ global telemetry_attributes_names
 telemetry_attributes_names = ('attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed')
 
 def get_telemetry():
-	attr = _get_vehicle_attributes(None)
-	ret = {}
-	for k in telemetry_attributes_names:
-		ret[k] = attr[k]
-	return ret
+    attr = _get_vehicle_attributes(None)
+    ret = {}
+    for k in telemetry_attributes_names:
+        ret[k] = attr[k]
+    return ret
 
 # --------------------
 # 
@@ -599,76 +555,76 @@ def main(argv):
             import dronekit_sitl
             vsitl = dronekit_sitl.start_default()
 
-	print "\nConnecting to vehicle at: %s" % (config['connection_string'])
+    print "\nConnecting to vehicle at: %s" % (config['connection_string'])
 
-	global vehicle 
-	vehicle = connect(config['connection_string'], wait_ready=True)
-	vehicle.wait_ready('autopilot_version')
+    global vehicle 
+    vehicle = connect(config['connection_string'], wait_ready=True)
+    vehicle.wait_ready('autopilot_version')
 
-	# Get some vehicle attributes (state)
-	print " GPS: %s" % vehicle.gps_0
-	print " Battery: %s" % vehicle.battery
-	print " Is Armable?: %s" % vehicle.is_armable
-	print " System status: %s" % vehicle.system_status.state
-	print " Mode: %s" % vehicle.mode.name
+    # Get some vehicle attributes (state)
+    print " GPS: %s" % vehicle.gps_0
+    print " Battery: %s" % vehicle.battery
+    print " Is Armable?: %s" % vehicle.is_armable
+    print " System status: %s" % vehicle.system_status.state
+    print " Mode: %s" % vehicle.mode.name
 
-	cometa_server = config['cometa']['server']
-	cometa_port = config['cometa']['port']
-	application_id = config['cometa']['app_key']
-	# use the machine's MAC address as Cometa device ID
-	device_id = Runtime.get_serial()
+    cometa_server = config['cometa']['server']
+    cometa_port = config['cometa']['port']
+    application_id = config['cometa']['app_key']
+    # use the machine's MAC address as Cometa device ID
+    device_id = Runtime.get_serial()
 
-	# ------------------------------------------------ #
-	print "Cometa client started.\r\ncometa_server:", cometa_server, "\r\ncometa_port:", cometa_port, "\r\napplication_id:", application_id, "\r\ndevice_id:", device_id
+    # ------------------------------------------------ #
+    print "Cometa client started.\r\ncometa_server:", cometa_server, "\r\ncometa_port:", cometa_port, "\r\napplication_id:", application_id, "\r\ndevice_id:", device_id
 
-	# Instantiate a Cometa object
-	com = CometaClient(cometa_server, cometa_port, application_id, config['cometa']['ssl'])
-	# Set debug flag
-	com.debug = config['app_params']['debug']
+    # Instantiate a Cometa object
+    com = CometaClient(cometa_server, cometa_port, application_id, config['cometa']['ssl'])
+    # Set debug flag
+    com.debug = config['app_params']['debug']
 
-	# Bind the message_handler() callback. The callback is doing the function of respoding
-	# to remote requests and handling the core part of the work of the application.
-	com.bind_cb(message_handler)
+    # Bind the message_handler() callback. The callback is doing the function of respoding
+    # to remote requests and handling the core part of the work of the application.
+    com.bind_cb(message_handler)
 
-	# Attach the device to Cometa.
-	ret = com.attach(device_id, "%s" % vehicle.version)
-	if com.error != 0:
-		print "(FATAL) Error in attaching to Cometa.", com.perror()
-		sys.exit(2)
+    # Attach the device to Cometa.
+    ret = com.attach(device_id, "%s" % vehicle.version)
+    if com.error != 0:
+        print "(FATAL) Error in attaching to Cometa.", com.perror()
+        sys.exit(2)
 
-	# When attach is successful the server returns an object of the format:
-	# {"msg":"200 OK","heartbeat":60,"timestamp":1441405206}
-	try:
-		ret_obj = json.loads(ret)
-	except Exception, e:
-		print "(FATAL) Error in parsing the message returned after attaching to Cometa. Message:", ret
-		sys.exit(2)
+    # When attach is successful the server returns an object of the format:
+    # {"msg":"200 OK","heartbeat":60,"timestamp":1441405206}
+    try:
+        ret_obj = json.loads(ret)
+    except Exception, e:
+        print "(FATAL) Error in parsing the message returned after attaching to Cometa. Message:", ret
+        sys.exit(2)
 
-	print "Device [%s] attached to Cometa. Server timestamp: %d" % (device_id, ret_obj['timestamp'])
-	if com.debug:
-		print "Server returned:", ret
+    print "Device [%s] attached to Cometa. Server timestamp: %d" % (device_id, ret_obj['timestamp'])
+    if com.debug:
+        print "Server returned:", ret
 
-	# Application main loop.
-	while True:
-		"""
-		Send a telemetry data event upstream. 
-		"""
-		time.sleep(config['app_params']['telemetry_period'])
-		msg = get_telemetry()
-		msg['id'] = device_id
-		msg['time'] = int(time.time())
-		msg['type'] = 1
+    # Application main loop.
+    while True:
+        """
+        Send a telemetry data event upstream. 
+        """
+        time.sleep(config['app_params']['telemetry_period'])
+        msg = get_telemetry()
+        msg['id'] = device_id
+        msg['time'] = int(time.time())
+        msg['type'] = 1
 
-		#now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-		#msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
-		continue #DEBUG
-		if com.send_data(str(msg)) < 0:
-			print "Error in sending data."
-		else:
-			if com.debug:
-				print "sending data event.", msg
+        #now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        #msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
+        continue #DEBUG
+        if com.send_data(str(msg)) < 0:
+            print "Error in sending data."
+        else:
+            if com.debug:
+                print "sending data event.", msg
 
-	print "***** should never get here"
+    print "***** should never get here"
 
 if __name__ == "__main__":
     main(sys.argv[1:])
