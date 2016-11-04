@@ -194,6 +194,7 @@ def _takeoff(params):
 	if ('alt') not in params.keys():
 		return {"success": False}
 	vehicle.simple_takeoff(params['alt'])
+    return {"success": True}
 
 """
 Moves the vehicle to the absolute or relative position specified.
@@ -452,24 +453,40 @@ def _send_global_velocity(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
-"""
-Command(pymavlink.dialects.v10.ardupilotmega.MAVLink_mission_item_message)
+def _new_mission(params):
+    """Reset flight plan."""
 
-A waypoint object.
- |  
- |  This object encodes a single mission item command. 
+    vehicle.commands.clear()
+    return {"success": True}
 
-  Message encoding a mission item. This message is emitted to
- |  announce                 the presence of a mission item and to
- |  set a mission item on the system. The mission item can be
- |  either in x, y, z meters (type: LOCAL) or x:lat, y:lon,
- |  z:altitude. Local frame is Z-down, right handed (NED), global
- |  frame is Z-up, right handed (ENU). See also
- |  http://qgroundcontrol.org/mavlink/waypoint_protocol.
- |  
+def _add_mission_item(params):
+    """Add an item to the flight plan.
 
+    params - a list of parameters for a single mission item command.
+        Type of the list is pymavlink.dialects.v10.ardupilotmega.MAVLink_mission_item_message.
+        It can contain literals in mavutil.mavlink namespace.
+    Ex. [0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+    """
 
-"""
+    if type(params) is not list:
+        return {"success": False}
+    p = tuple(params)
+#    if len(p) != 14:        
+#        return {"success": False}
+    vehicle.commands.add(Command(*p))
+    return {"success": True}
+
+def _start_mission(params):
+    """Start current flight plan."""
+
+    # upload commands to the vehicle
+    vehicle.commands.upload()
+    # mission set to first item in the flight plan
+    vehicle.commands.next = 0
+    # set mode to AUTO to start mission
+    vehicle.mode = VehicleMode("AUTO")
+    return {"success": True}
+
 global rpc_methods
 rpc_methods = ({'name':'shell','function':_shell}, 
 #               {'name':'status','function':show_status}, 
@@ -492,6 +509,9 @@ rpc_methods = ({'name':'shell','function':_shell},
                {'name':'point_camera','function':_point_camera},
                {'name':'send_ned_velocity','function':_send_ned_velocity},
                {'name':'send_global_velocity','function':_send_global_velocity},
+               {'name':'new_mission','function':_new_mission},
+               {'name':'add_mission_item','function':_add_mission_item},
+               {'name':'start_mission','function':_start_mission},
 )
 
 def message_handler(msg, msg_len):
