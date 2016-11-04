@@ -167,7 +167,7 @@ def _set_telemetry_period(params):
 		return {"success": False}
 	if params['period'] <= 0:
 		return {"success": False}
-	config['app_params']['event_loop'] = params['period']
+	config['app_params']['telemetry_period'] = params['period']
 	return {"success": True}
 
 """
@@ -452,6 +452,24 @@ def _send_global_velocity(params):
     vehicle.send_mavlink(msg)
     return {"success": True}
 
+"""
+Command(pymavlink.dialects.v10.ardupilotmega.MAVLink_mission_item_message)
+
+A waypoint object.
+ |  
+ |  This object encodes a single mission item command. 
+
+  Message encoding a mission item. This message is emitted to
+ |  announce                 the presence of a mission item and to
+ |  set a mission item on the system. The mission item can be
+ |  either in x, y, z meters (type: LOCAL) or x:lat, y:lon,
+ |  z:altitude. Local frame is Z-down, right handed (NED), global
+ |  frame is Z-up, right handed (ENU). See also
+ |  http://qgroundcontrol.org/mavlink/waypoint_protocol.
+ |  
+
+
+"""
 global rpc_methods
 rpc_methods = ({'name':'shell','function':_shell}, 
 #               {'name':'status','function':show_status}, 
@@ -544,13 +562,22 @@ def get_telemetry():
 # Entry point
 
 def main(argv):
-	global config
-	config = Runtime.read_config()
-
-	if config['sitl']:
-		import dronekit_sitl
-		global vsitl 
-		vsitl = dronekit_sitl.start_default()
+    global config
+    config = Runtime.read_config()
+    if config['use_sitl']:
+        if 'sitl' in config:
+            # https://github.com/dronekit/dronekit-sitl
+            from dronekit_sitl import SITL
+            vsitl = SITL()
+            # values for 'system':
+            #   >>> print dronekit_sitl.version_list().keys()
+            #   >>> [u'solo', u'plane', u'copter', u'rover']
+            vsitl.download(config['sitl']['system'],config['sitl']['version'],verbose=True)
+            vsitl.launch(config['sitl']['args'],verbose=True)
+            vsitl.block_until_ready()
+        else:
+            import dronekit_sitl
+            vsitl = dronekit_sitl.start_default()
 
 	print "\nConnecting to vehicle at: %s" % (config['connection_string'])
 
@@ -606,7 +633,7 @@ def main(argv):
 		"""
 		Send a telemetry data event upstream. 
 		"""
-		time.sleep(config['app_params']['event_loop'])
+		time.sleep(config['app_params']['telemetry_period'])
 		msg = get_telemetry()
 		msg['id'] = device_id
 		msg['time'] = int(time.time())
