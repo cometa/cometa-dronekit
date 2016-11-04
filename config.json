@@ -2,7 +2,7 @@
     "config":{
         "connection_string":"tcp:127.0.0.1:5760", 
         "use_sitl":true, 
-        "cometa":{"ssl":true,"server":"dronekit.cometa.io", "cport": 443, "app_key":"80d25d08e5fa6e13fb0a"},
+        "cometa":{"ssl":true,"server":"dronekit.cometa.io", "port": 443, "app_key":"80d25d08e5fa6e13fb0a"},
         "app_params":{"debug":false,"telemetry_period":1},
         "sitl":{"system":"copter","version":"3.3","args":["-S","--home=37.423455,-122.176394,40,350","--gimbal"]}
     },
