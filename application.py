@@ -30,6 +30,7 @@ from cometalib import CometaClient
 from dronekit import connect, VehicleMode, LocationGlobal, LocationGlobalRelative, Command
 from pymavlink import mavutil
 import utils
+import pdb
 
 # JSON-RPC errors
 JSON_RPC_PARSE_ERROR = '{"jsonrpc": "2.0","error":{"code":-32700,"message":"Parse error"},"id": null}'
@@ -143,14 +144,15 @@ def _get_vehicle_parameters(params):
     return vehicle.parameters.__dict__['_attribute_cache']
 
 def _set_vehicle_parameters(params):
-    """Set one or more vehicle parameters.
+    """Set one vehicle parameter.
 
     params - JSON object {'key':'THR_MIN', 'value': 100}
     """
+    #pdb.set_trace()
 
     if ('key' and 'value') not in params.keys():
         return {"success": False}
-    vehicle.parameters[params['key']] = params['value']
+    vehicle.parameters[str(params['key'])] = params['value']
     return {"success": True}
 
 def _get_home_location(params):
@@ -195,15 +197,18 @@ def _set_telemetry_attributes(params):
 
     params - An array of attribute names in the allowed set.
     """
+    global telemetry_attributes_names
 
     if type(params) is not list:
         return {"success": False}
-    tparams = tuple(params)
-    allowed = ('attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed')
+
+    #tparams = tuple(params)
+    tparams = params
+    allowed = ['attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed']
     for x in tparams:
         if x not in allowed:
             return {"success": False}
-    telemetry_attributes_names = tparams
+    telemetry_attributes_names = list(params)
     return {"success": True}
 
 def _takeoff(params):
@@ -216,6 +221,7 @@ def _takeoff(params):
         return {"success": False}
     if ('alt') not in params.keys():
         return {"success": False}
+    # TODO check for mode and that the vehicle is ready for takeoff
     vehicle.simple_takeoff(params['alt'])
     return {"success": True}
 
@@ -282,7 +288,7 @@ def _goto_position_target_global_int(params):
     return {"success": True}
 
 def _goto_position_target_local_ned(params):
-    """Move the vehicle to the global position specified.
+    """Move the vehicle to the local position specified.
 
     params - JSON object {"north": -34.2, "east": 149.2, "down" = 3.0}
     """
@@ -477,7 +483,7 @@ def message_handler(msg, msg_len):
     It returns the JSON-RPC result object to send back to the application that sent the request.
     The rpc_methods tuple contains the mapping of names into functions.
     """
-    #pdb.set_trace()
+#    pdb.set_trace()
     try:
         req = json.loads(msg)
     except:
@@ -523,9 +529,6 @@ def message_handler(msg, msg_len):
 
     return json.dumps(reply)
 
-global telemetry_attributes_names
-telemetry_attributes_names = ('attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed')
-
 def get_telemetry():
     attr = _get_vehicle_attributes(None)
     ret = {}
@@ -560,6 +563,9 @@ def main(argv):
     global vehicle 
     vehicle = connect(config['connection_string'], wait_ready=True)
     vehicle.wait_ready('autopilot_version')
+
+    global telemetry_attributes_names
+    telemetry_attributes_names = ['attitude','location','velocity','battery','state','groundspeed','airspeed','mode','armed']
 
     # Get some vehicle attributes (state)
     print " GPS: %s" % vehicle.gps_0
@@ -617,7 +623,6 @@ def main(argv):
 
         #now = strftime("%Y-%m-%d %H:%M:%S", gmtime())
         #msg = "{\"id\":\"%s\",\"time\":\"%s\"}" % (device_id, now)
-        continue #DEBUG
         if com.send_data(str(msg)) < 0:
             print "Error in sending data."
         else:
