@@ -2,6 +2,9 @@
 # 
 # Utility functions
 
+import math
+from dronekit import LocationGlobal, LocationGlobalRelative
+
 def check_rpc_msg(req):
     ret = False
     id = None

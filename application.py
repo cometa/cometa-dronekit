@@ -30,6 +30,8 @@ from cometalib import CometaClient
 from dronekit import connect, VehicleMode, LocationGlobal, LocationGlobalRelative, Command
 from pymavlink import mavutil
 import utils
+import math
+
 import pdb
 
 # JSON-RPC errors
@@ -235,8 +237,8 @@ def _goto(params):
         return {"success": False}
     if ('lat' and 'lon' and 'alt' and 'relative') not in params.keys():
         return {"success": False}
-    if relative:
-        dest = LocationGlobalRelative(lat, lon, alt)
+    if params['relative']:
+        dest = LocationGlobalRelative(params['lat'], params['lon'], params['alt'])
     else:
         dest = LocationGlobal(params['lat'], params['lon'], params['alt'])
     vehicle.simple_goto(dest)
@@ -253,7 +255,7 @@ def _goto_destination(params):
     if ('dNorth' and 'dEast') not in params.keys():
         return {"success": False}
     curLocation = vehicle.location.global_relative_frame
-    dest = utils.get_location_meters(curLocation, dNorth, dEast)
+    dest = utils.get_location_meters(curLocation, params['dNorth'], params['dEast'])
     vehicle.simple_goto(dest)
     return {"success": True}
 
@@ -302,7 +304,7 @@ def _goto_position_target_local_ned(params):
         0, 0,    # target system, target component
         mavutil.mavlink.MAV_FRAME_LOCAL_NED, # frame
         0b0000111111111000, # type_mask (only positions enabled)
-        north, east, down, # x, y, z positions (or North, East, Down in the MAV_FRAME_BODY_NED frame
+        params['north'], params['east'], params['down'], # x, y, z positions (or North, East, Down in the MAV_FRAME_BODY_NED frame
         0, 0, 0, # x, y, z velocity in m/s  (not used)
         0, 0, 0, # x, y, z acceleration (not supported yet, ignored in GCS_Mavlink)
         0, 0)    # yaw, yaw_rate (not supported yet, ignored in GCS_Mavlink) 
@@ -407,9 +409,9 @@ def _send_global_velocity(params):
         0, # lon_int - Y Position in WGS84 frame in 1e7 * meters
         0, # alt - Altitude in meters in AMSL altitude(not WGS84 if absolute or relative)
         # altitude above terrain if GLOBAL_TERRAIN_ALT_INT
-        velocity_x, # X velocity in NED frame in m/s
-        velocity_y, # Y velocity in NED frame in m/s
-        velocity_z, # Z velocity in NED frame in m/s
+        params['velocity_x'], # X velocity in NED frame in m/s
+        params['velocity_y'], # Y velocity in NED frame in m/s
+        params['velocity_z'], # Z velocity in NED frame in m/s
         0, 0, 0, # afx, afy, afz acceleration (not supported yet, ignored in GCS_Mavlink)
         0, 0)    # yaw, yaw_rate (not supported yet, ignored in GCS_Mavlink) 
     # send command to vehicle
@@ -427,8 +429,10 @@ def _add_mission_item(params):
 
     params - a list of parameters for a single mission item command.
         Type of the list is pymavlink.dialects.v10.ardupilotmega.MAVLink_mission_item_message.
-        It can contain literals in mavutil.mavlink namespace.
-    Ex. [0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+    Ex. [0, 0, 0, 3, 22, 0, 0, 0, 0, 0, 0, 0, 0, 10]
+        mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT === 3
+        mavutil.mavlink.MAV_CMD_NAV_TAKEOFF === 22
+
     """
 
     if type(params) is not list:
@@ -533,7 +537,7 @@ def get_telemetry():
     attr = _get_vehicle_attributes(None)
     ret = {}
     for k in telemetry_attributes_names:
-        ret[k] = attr[k]
+        ret[str(k)] = attr[k]
     return ret
 
 # --------------------
