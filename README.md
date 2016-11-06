@@ -1,7 +1,8 @@
 ![alt tag](https://img.shields.io/badge/python-2.7-blue.svg)
 # cometa-dronekit
-## Enable cloud communication in DroneKit unmanned vehicles
+Cloud API for drones and unmanned vehicles
 
+## Overview
 Low-latency, secure cloud communication for connected UAVs and ROVs using the Cometa server. [Cometa](http://www.cometa.io) is a two-way message broker for device-to-cloud and cloud-to-device secure communication. It runs on a server in the cloud and it uses HTTPS and secure WebSockets for efficient remote interaction of applications and vehicles.
 
 `cometa-dronekit` is a [DroneKit](http://python.dronekit.io/) script running on a UV that manages the connection to the Cometa server and exposes methods for [JSON-RPC](http://www.jsonrpc.org/specification) remote procedure calls to the vehicle. Applications use the JSON-RPC API documented below to interact with one or many connected UVs using HTTPS and to receive real-time telemetry on secure WebSockets.
@@ -10,6 +11,23 @@ This software relies on DroneKit and it runs natively on 3DR Solo drones and on 
 
 **If you are interested in receiving beta tester credentials and access to a Cometa cloud server for testing the `cometa-dronekit` API send an email to marco@cometarobotics.com**
 
+## Dependencies
+```
+pip install dronekit
+pip install dronekit-sitl
+pip install http-parser
+pip install pymavlink
+```
+## Usage
+`cometa-dronekit` is a stand-alone application. Configuration is in the `config.json` file.
+```
+./application.py
+```
+To run in the background, detach it from the terminal and re-direct output to a log file:
+```
+nohup python ./application.py > /tmp/dronekit.log 2>&1 &
+```
+
 ## Connecting to autopilot
 DroneKit relies on a ArduPilot APM compatible stack and controller, such as the [Pixhawk](https://pixhawk.org/modules/pixhawk).
 The autopilot connection string for the `cometa-dronekit` script is specified in the `config.json` file. To use `cometa-dronekit` with DroneKit's embedded SITL, set the `sitl` parameter to `true` and use the appropriate connection string.
@@ -17,7 +35,7 @@ The autopilot connection string for the `cometa-dronekit` script is specified in
 >DroneKit connection strings options are documented in  [Connecting to a Vehicle](http://python.dronekit.io/guide/connecting_vehicle.html)
 
 
-Remote API
+Cloud API
 ----------
 Once the `cometa-dronekit` application is started on the vehicle, it will connect to the Cometa server and the Application Key specified in the `config.json` file. This connection will be kept open permanently and used for full-duplex communication through the Cometa message broker. Since the connection is initiated from within a NAT or a firewall on stadard port 443, which is typically open for outgoing traffic, the vechicle becomes accessible from an application using the `cometa-dronekit` API without exposing or even knowing its public IP address.
 
