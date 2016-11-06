@@ -30,7 +30,6 @@ from cometalib import CometaClient
 from dronekit import connect, VehicleMode, LocationGlobal, LocationGlobalRelative, Command
 from pymavlink import mavutil
 import utils
-import math
 
 import pdb
 
