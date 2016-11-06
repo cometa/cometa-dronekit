@@ -576,7 +576,7 @@ Vehicle takes off to the specified altitude in meters.
 Example:
 ```
 $ curl -X POST -H 'Authorization: OAuth a724dc4811d507688' -H 'Content-type: application/json' \
-    -d '{"jsonrpc":"2.0","method":"takeoff","params":{"alt":12.0},"id":7},"id":7}' \
+    -d '{"jsonrpc":"2.0","method":"takeoff","params":{"alt":12.0},"id":7}' \
     https://dronekit.cometa.io/v1/applications/a94660d971eca2879/devices/e984060007/send
 
 {
@@ -596,7 +596,7 @@ Move the vehicle to the specified position. The new position can be either in th
 Example:
 ```
 $ curl -X POST -H 'Authorization: OAuth a724dc4811d507688' -H 'Content-type: application/json' \
-    -d '{"jsonrpc":"2.0","method":"goto","params":{"lat":-32.2,"lon":149.2 "alt":3.0,"relative":false},"id":7}' \
+    -d '{"jsonrpc":"2.0","method":"goto","params":{"lat":-32.2,"lon":149.2,"alt":3.0,"relative":false},"id":7}' \
     https://dronekit.cometa.io/v1/applications/a94660d971eca2879/devices/e984060007/send
 
 {
@@ -761,7 +761,7 @@ Parameters:
 * `param2` - Command specific parameter.
 
 * `param3` - Command specific parameter.
-* 
+
 * `param4` - Command specific parameter.
 
 * `x` - (param5) Command specific parameter used for latitude (if relevant to command). 
